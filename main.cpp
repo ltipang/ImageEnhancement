@@ -10,23 +10,22 @@
 using namespace cv;
 using namespace std;
 
+#include "oneHDR.h"
 
 int main( int argc, char** argv )
 {
-	cv::Mat image1, image2, image3;
-	cv::Mat image0_1, image0_2, image1_1, image1_3;
-
-	
-
-	cv::Mat out;
+	cv::Mat inputImg, outputImg;
+	inputImg = cv::imread("images\\input.jpg");
     printf("Stitching ... \n");
 	int64 t = getTickCount();
-   // processing
-
+    // processing
+	outputImg = oneHDR(inputImg);
 	double time = (getTickCount() - t) / getTickFrequency() * 1000;
-	printf("time: %f\n", time / 10);
-
-	cv::imwrite("result.jpg", out);
-
-    return 0;
+	//printf("time: %f\n", time / 10);
+	// output
+	/*cv::imshow("inputImg", inputImg);
+	cv::imshow("outputImg", outputImg);
+	cv::waitKey(0);
+	cv::destroyAllWindows();*/
+	return 0;
 }

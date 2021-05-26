@@ -23,6 +23,5 @@ int main( int argc, char** argv )
 	cv::imshow("outputImg", outputImg);
 	cv::waitKey(0);
 	cv::destroyAllWindows();*/
-	sample_solve();
 	return 0;
 }

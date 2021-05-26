@@ -1,25 +1,46 @@
 #include "oneHDR.h"
+#include "SpSolve.h"
+
+void display(float *array, int cols, int row)
+{
+	cout << row << "th row:\n";
+	for (int i = 0; i < cols; i++) {
+		cout << i << "," << array[row * cols + i] << endl;
+	}
+	cout << endl;
+}
+
+void display(float *array, int cols, int row1, int row2)
+{
+	cout << row1 << "," << row2 << "th row:\n";
+	for (int i = 0; i < cols; i++) {
+		cout << i << "," << array[row1 * cols + i] << "," << array[row2 * cols + i] << endl;
+	}
+	cout << endl;
+}
 
 cv::Mat oneHDR(cv::Mat &inputImg, float mu, float a, float b)
 {
-	cv::Mat I;
 	uchar *I_d_ind;
 	int size;
 	float *t_b, *t_our;
+	cv::Mat I;
+	cv::resize(inputImg, I, cv::Size(256, 256), 0, 0, CV_INTER_CUBIC);
 
-	size = inputImg.rows * inputImg.cols;
+	size = I.rows * I.cols;
 	// initialize
 	t_b = new float[size]; //cv::Mat aa(size, 1, CV_32FC1, t_b);
 	//
-	I_d_ind = inputImg.data;
+	I_d_ind = I.data;
 	for (int ind = 0; ind < size; ind++) {
-		t_b[ind] = max(max(I_d_ind[0], I_d_ind[1]), I_d_ind[2]) / 255.0;
+		t_b[ind] = max(max(I_d_ind[0], I_d_ind[1]), I_d_ind[2]) / 255.0f;
 		//cout << inputImg.at<Vec3b>(ind / inputImg.cols, ind % inputImg.cols) << ", " << t_b[ind] << endl;
 		I_d_ind += 3;
 	}
-	cv::Mat t_b_(inputImg.rows, inputImg.cols, CV_32FC1, t_b);
+	/*cv::Mat t_b_(inputImg.rows, inputImg.cols, CV_32FC1, t_b), I;
 	cv::resize(t_b_, I, cv::Size(256, 256), 0, 0, CV_INTER_CUBIC);
-	t_our = tsmooth((float*)I.data, I.rows);
+	t_our = tsmooth((float*)I.data, I.rows);*/
+	t_our = tsmooth((float*)t_b, I.rows);
 	/*cout << I.at<Vec3b>(0, 0) << endl;
 	cout << I_d[0] / 255.0 << "," << I_d[1] / 255.0 << "," << I_d[2] / 255.0  << endl;*/
 	/*img2.data;
@@ -37,6 +58,7 @@ cv::Mat oneHDR(cv::Mat &inputImg, float mu, float a, float b)
 
 	//dst *= 255.0;
 	//dst.convertTo(img3, CV_8UC3);
+	//sample_solve();
 	return inputImg;
 }
 
@@ -62,10 +84,9 @@ void computeTextureWeights(float *fin, int rows, int sigma, float sharpness, flo
 			dt0_h[i * rows + j] = fin[i * rows + next_j] - fin[i * rows + j];
 		}
 	}
-
 	cv::Mat dt0_v_(rows, rows, CV_32FC1, dt0_v);
 	cv::Mat dt0_h_(rows, rows, CV_32FC1, dt0_h);
-	cv::Mat gauker_h, gauker_v, kernel_v(1, sigma, CV_8UC1, 1), kernel_h(sigma, 1, CV_8UC1, 1);
+	cv::Mat gauker_h, gauker_v, kernel_v(1, sigma, CV_32FC1, 1.0f), kernel_h(sigma, 1, CV_32FC1, 1.0f);
 	cv::filter2D(dt0_v_, gauker_v, -1, kernel_v, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
 	cv::filter2D(dt0_h_, gauker_h, -1, kernel_h, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
 
@@ -82,7 +103,7 @@ void computeTextureWeights(float *fin, int rows, int sigma, float sharpness, flo
 float* solveLinearEquation(float *IN, int rows, float *wx, float *wy, float lambd)
 {
 	int size = rows * rows;
-	float *dx, *dy, *dxa, *dya;
+	float *dx, *dy, *dxa, *dya, *matCol;
 	float *dxd1 = new float[size], *dyd1 = new float[size], *dxd2 = new float[size], *dyd2 = new float[size];
 
 	dx = convertCol(wx, rows, -lambd);
@@ -93,10 +114,69 @@ float* solveLinearEquation(float *IN, int rows, float *wx, float *wy, float lamb
 	memcpy(dxd2, dx, sizeof(float) * size); memcpy(dyd2, dy, sizeof(float) * size);
 	for (int i = 0; i < rows; i++) {
 		dxd1[i] = dxa[i];
-		dxd1[i * rows] = dya[i * rows];
+		dyd1[i * rows] = dya[i * rows];
 		dxd2[(rows - 1) * rows + i] = 0;
 		dyd2[i * rows + (rows - 1)] = 0;
 	}
+	// spSolve
+	std::vector<T> tripletlist;
+	for (int i = 0; i < size; i++){
+		tripletlist.push_back(T(i, i, (1.0f - (dx[i] + dy[i] + dxa[i] + dya[i])) / 1.0f));
+		int i1 = size - rows + i; 
+		if (i1 < size) {
+			if (dxd1[i] != 0.0f) {
+				tripletlist.push_back(T(i1, i, dxd1[i] / 1.0f));
+				tripletlist.push_back(T(i, i1, dxd1[i] / 1.0f));
+			}
+		}
+		int i2 = rows + i;
+		if (i2 < size){
+			if (dxd2[i] != 0.0f) {
+				tripletlist.push_back(T(i2, i, dxd2[i] / 1.0f));
+				tripletlist.push_back(T(i, i2, dxd2[i] / 1.0f));
+			}
+		}
+		int i3 = i2 - 1;
+		if (i3 < size) {
+			if (dyd1[i] != 0.0f) {
+				tripletlist.push_back(T(i3, i, dyd1[i] / 1.0f));
+				tripletlist.push_back(T(i, i3, dyd1[i] / 1.0f));
+			}
+		}
+		int i4 = i + 1;
+		if (i4 < size) {
+			if (dyd2[i] != 0.0f) {
+				tripletlist.push_back(T(i4, i, dyd2[i] / 1.0f));
+				tripletlist.push_back(T(i, i4, dyd2[i] / 1.0f));
+			}
+		}
+	}
+	float max_t = tripletlist[0].value(), min_t = tripletlist[0].value();
+	for (size_t i = 1; i < tripletlist.size(); i++) {
+		max_t = max(max_t, tripletlist[i].value());
+		min_t = min(min_t, tripletlist[i].value());
+	}
+	cout << max_t << " " << min_t << endl;
+	matCol = convertCol(IN, rows, 1.0f);
+	SparseMatrixType A(size, size);
+	Eigen::VectorXf x;
+	Eigen::VectorXf b;
+	A.setFromTriplets(tripletlist.begin(), tripletlist.end());
+	A.makeCompressed();
+	b.resize(size);
+	for (int i = 0; i < size; i++)
+	{
+		b(i) = matCol[i];
+	}
+	Solve *p_A = new Solve(A);
+	x = p_A->solve(b);
+	float max_x = x(0), min_x = x(0);
+	for (int i = 1; i < size; i++)
+	{
+		max_x = max(max_x, x(i));
+		min_x = min(min_x, x(i));
+	}
+	cout << max_x / 1.0f << " " << min_x / 1.0f << endl;
 	return IN;
 }
 

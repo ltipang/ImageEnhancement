@@ -1,9 +1,5 @@
 #include "SpSolve.h"
 
-typedef Eigen::SparseMatrix<double> SparseMatrixType;
-typedef Eigen::Triplet<double> T;
-typedef Eigen::SimplicialCholesky<SparseMatrixType> Solve;
-
 
 int sample_solve()
 {
@@ -12,8 +8,8 @@ int sample_solve()
 	row_b = row_A;
 
 	SparseMatrixType A(row_A, col_A);
-	Eigen::VectorXd x;
-	Eigen::VectorXd b;
+	Eigen::VectorXf x;
+	Eigen::VectorXf b;
 	std::vector<T> tripletlist;
 
 	b.resize(row_b);

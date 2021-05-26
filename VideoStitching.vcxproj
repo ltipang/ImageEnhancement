@@ -149,7 +149,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>include;C:\Program Files %28x86%29\IntelSWTools\system_studio_2020\OpenCL\sdk\include;G:\up_o\20200525 - C++ image enhancement\ImageEnhancement\eigen</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;C:\Program Files %28x86%29\IntelSWTools\system_studio_2020\OpenCL\sdk\include;eigen</AdditionalIncludeDirectories>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>

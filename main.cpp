@@ -11,17 +11,16 @@
 int main( int argc, char** argv )
 {
 	cv::Mat inputImg, outputImg;
-	inputImg = cv::imread("images\\input.jpg");
-    printf("Stitching ... \n");
+	inputImg = cv::imread("..\\testing images\\input.jpg");
 	int64 t = cv::getTickCount();
     // processing
 	outputImg = oneHDR(inputImg);
 	double time = (cv::getTickCount() - t) / cv::getTickFrequency() * 1000;
-	//printf("time: %f\n", time / 10);
+	printf("time: %f ms\n", time / 10);
 	// output
-	/*cv::imshow("inputImg", inputImg);
+	cv::imshow("inputImg", inputImg);
 	cv::imshow("outputImg", outputImg);
 	cv::waitKey(0);
-	cv::destroyAllWindows();*/
+	cv::destroyAllWindows();
 	return 0;
 }

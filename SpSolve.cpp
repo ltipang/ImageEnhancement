@@ -3,6 +3,7 @@
 
 int sample_solve()
 {
+	/*
 	int row_A, col_A, row_b;
 	col_A = 100; row_A = 100;
 	row_b = row_A;
@@ -35,6 +36,6 @@ int sample_solve()
 	for (int i = 0; i < x.size(); i++)
 	{
 		std::cout << x(i) << "\n";
-	}
+	}*/
 	return 0;
 }

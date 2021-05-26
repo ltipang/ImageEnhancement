@@ -73,6 +73,9 @@ cv::Mat oneHDR(cv::Mat &inputImg)
 	}
 	cv::Mat dst(I.rows, I.cols, CV_32FC3, fused), final_img;
 	dst.convertTo(final_img, CV_8UC3);
+	
+	delete[]t_b;
+	delete[]fused;
 	return final_img;
 }
 

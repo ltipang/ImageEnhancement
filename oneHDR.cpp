@@ -2,7 +2,7 @@
 
 cv::Mat oneHDR(cv::Mat &inputImg, float mu, float a, float b)
 {
-	Mat I;
+	cv::Mat I;
 	uchar *I_d_ind;
 	int size;
 	float *t_b, *t_our;
@@ -66,8 +66,8 @@ void computeTextureWeights(float *fin, int rows, int sigma, float sharpness, flo
 	cv::Mat dt0_v_(rows, rows, CV_32FC1, dt0_v);
 	cv::Mat dt0_h_(rows, rows, CV_32FC1, dt0_h);
 	cv::Mat gauker_h, gauker_v, kernel_v(1, sigma, CV_8UC1, 1), kernel_h(sigma, 1, CV_8UC1, 1);
-	cv::filter2D(dt0_v_, gauker_v, -1, kernel_v, cv::Point(-1, -1), 0.0, BORDER_CONSTANT);
-	cv::filter2D(dt0_h_, gauker_h, -1, kernel_h, cv::Point(-1, -1), 0.0, BORDER_CONSTANT);
+	cv::filter2D(dt0_v_, gauker_v, -1, kernel_v, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
+	cv::filter2D(dt0_h_, gauker_h, -1, kernel_h, cv::Point(-1, -1), 0.0, cv::BORDER_CONSTANT);
 
 	float *gauker_h_t, *gauker_v_t;
 	gauker_h_t = (float*)gauker_h.data; gauker_v_t = (float*)gauker_v.data;

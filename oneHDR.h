@@ -2,7 +2,6 @@
 #include "opencv2/opencv.hpp"
 #include <iostream>
 
-using namespace cv;
 using namespace std;
 
 cv::Mat oneHDR(cv::Mat &inputImg, float mu = 0.5f, float a = -0.3293f, float b = 1.1258f);

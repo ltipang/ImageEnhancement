@@ -35,7 +35,7 @@ cv::Mat oneHDR(cv::Mat &inputImg)
 {
 	float *I_d_ind;
 	int size;
-	float *t_b, *t_our;
+	float *t_b;
 	cv::Mat I, I1;	inputImg.convertTo(I, CV_32FC3); I /= 255.0;
 	size = inputImg.rows * inputImg.cols;
 	t_b = new float[size]; //cv::Mat aa(size, 1, CV_32FC1, t_b);
@@ -48,7 +48,8 @@ cv::Mat oneHDR(cv::Mat &inputImg)
 	cv::resize(t_b_, I1, cv::Size(256, 256), 0, 0, CV_INTER_CUBIC);
 	size = I1.rows * I1.rows;
 	//t_our = tsmooth(load_binary_to_array("t_b2", I.rows * I.rows), I.rows);
-	t_our = tsmooth((float*)I1.data, I1.rows);
+	float *t_our = new float[size * 2];
+	tsmooth((float*)I1.data, t_our, I1.rows );
 	//save_array_to_binary("t_our", t_our, 2 * I.rows * I.rows);
 	//t_our = load_binary_to_array("t_our", 2 * size);
 	float *W_f = t_our + size;
@@ -65,7 +66,8 @@ cv::Mat oneHDR(cv::Mat &inputImg)
 		cv::imwrite("1-t.jpg", (1 - t) * 255);
 	}
 	//
-	float *J = maxEntropyEnhance(I, t);
+	float *J = new float[I.cols * I.rows * 3];
+	maxEntropyEnhance(I, t, J);
 	size = I.cols * I.rows * 3;
 	float *fused = new float[size], *I_ = (float*)I.data, *W_ = (float*)W.data;
 	for (int i = 0; i < size; i++) {
@@ -74,18 +76,25 @@ cv::Mat oneHDR(cv::Mat &inputImg)
 	cv::Mat dst(I.rows, I.cols, CV_32FC3, fused), final_img;
 	dst.convertTo(final_img, CV_8UC3);
 	
-	delete[]t_b;
-	delete[]fused;
+	delete[] t_b;
+	delete[] fused;
+	delete[] t_our;
+	delete[] J;
 	return final_img;
 }
 
-float* tsmooth(float *I, int rows, float lambd, int sigma, float sharpness)
+int tsmooth(float *I, float *t_W, int rows, float lambd, int sigma, float sharpness)
 {
 	int size = rows * rows;
-	float *wx = new float[size], *wy = new float[size], *S;
+	float *wx = new float[size], *wy = new float[size];
 	computeTextureWeights(I, rows, sigma, sharpness, wx, wy);
-	S = solveLinearEquation(I, rows, wx, wy, lambd);
-	return S;
+	
+	solveLinearEquation(I, rows, wx, wy, lambd, t_W);
+
+	delete[] wx;
+	delete[] wy;
+
+	return 1;
 }
 
 void computeTextureWeights(float *fin, int rows, int sigma, float sharpness, float *W_h, float *W_v)
@@ -117,7 +126,7 @@ void computeTextureWeights(float *fin, int rows, int sigma, float sharpness, flo
 	delete[]dt0_h;
 }
 
-float* solveLinearEquation(float *IN, int rows, float *wx, float *wy, float lambd)
+int solveLinearEquation(float *IN, int rows, float *wx, float *wy, float lambd, float *t_W)
 {
 	int size = rows * rows;
 	float *dx, *dy, *dxa, *dya, *matCol;
@@ -180,7 +189,7 @@ float* solveLinearEquation(float *IN, int rows, float *wx, float *wy, float lamb
 	}
 	Solve *p_A = new Solve(A);
 	x = p_A->solve(b);
-	float *t_W = new float[size * 2], *t = t_W, *W = t_W + size;
+	float *t = t_W, *W = t_W + size;
 	for (int i = 0; i < rows; i++) {
 		for (int j = 0; j < rows; j++) {
 			t[i * rows + j] = x[j * rows + i];
@@ -190,8 +199,9 @@ float* solveLinearEquation(float *IN, int rows, float *wx, float *wy, float lamb
 
 	delete[]dx; delete[]dy; delete[]dxa; delete[]dya; delete[]matCol;
 	delete[]dxd1; delete[]dyd1; delete[]dxd2; delete[]dyd2;
+	delete p_A;
 	tripletlist.clear();
-	return t_W;
+	return 1;
 }
 
 float* convertCol(float *wx, int rows, float lambd)
@@ -229,7 +239,7 @@ float* convertCol_delay_col(float *wx, int rows, float lambd)
 	return dx;
 }
 
-float* maxEntropyEnhance(cv::Mat &I, cv::Mat &t, float bad_threshold, float a, float b)
+int maxEntropyEnhance(cv::Mat &I, cv::Mat &t, float *J, float bad_threshold, float a, float b)
 {
 	cv::Mat Y1, t1;
 	cv::resize(I, Y1, cv::Size(50, 50));
@@ -272,12 +282,12 @@ float* maxEntropyEnhance(cv::Mat &I, cv::Mat &t, float bad_threshold, float a, f
 	//applyK(I, opt_k)
 	delete[]Y;
 	int size = I.cols * I.rows * 3;
-	float *J = new float[size], *I_ = (float*)I.data;
+	float *I_ = (float*)I.data;
 	float gamma = pow(opt_val, a), beta = exp((1 - gamma) * b);
 	for (int i = 0; i < size; i++) {
 		J[i] = pow(I_[i], gamma) * beta;
 	}
-	return J;
+	return 1;
 }
 
 float entropy(float *Y, int num)

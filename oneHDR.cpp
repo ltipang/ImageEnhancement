@@ -3,93 +3,69 @@
 
 bool debug = false;
 
-void display(float *array, int cols, int row1, int row2, int row3, int row4)
-{
-	cout << "New array\n";
-	for (int i = 0; i < cols; i++) {
-		cout << i << ",\t" << array[row1 * cols + i] << ",\t" << array[row2 * cols + i] << ",\t" << array[row3 * cols + i] << ",\t" << array[row4 * cols + i] << endl;
-	}
-	cout << endl << endl;
-}
-
-float* load_binary_to_array(const char* binary_file, int num)
-{
-	float *array_val;
-	FILE *file;
-	file = fopen(binary_file, "rb");
-	array_val = new float[num];
-	fread(array_val, sizeof(float), num, file);
-	fclose(file);
-	return array_val;
-}
-
-void save_array_to_binary(const char* binary_file, float *t_our, int num)
-{
-	FILE *file;
-	file = fopen("t_our", "wb");
-	fwrite(t_our, sizeof(float), num, file);
-	fclose(file);
-}
-
 cv::Mat oneHDR(cv::Mat &inputImg)
 {
-	float *I_d_ind;
-	int size;
-	float *t_b;
-	cv::Mat I, I1;	inputImg.convertTo(I, CV_32FC3); I /= 255.0;
-	size = inputImg.rows * inputImg.cols;
-	t_b = new float[size]; //cv::Mat aa(size, 1, CV_32FC1, t_b);
-	I_d_ind = (float*)I.data;
-	for (int ind = 0; ind < size; ind++) {
-		t_b[ind] = max(max(I_d_ind[0], I_d_ind[1]), I_d_ind[2]);
-		I_d_ind += 3;
+	cv::Mat I;	inputImg.convertTo(I, CV_32FC1); I /= 255.0;
+
+	// finalize
+	float gamma = 0.0f, beta = 0.0f;
+	float temp;
+	cv::Mat W = get_enhance_params(I, gamma, beta);
+	int size = inputImg.cols * inputImg.rows;
+	float *fused = new float[size], *I_ = (float*)I.data, *W_ = (float*)W.data;
+	for (int i = 0; i < size; i++) {
+		temp = pow(I_[i], gamma) * beta;
+		fused[i] = ((I_[i] * W_[i]) + temp * (1.0f - W_[i])) * 255.0f;
 	}
-	cv::Mat t_b_(inputImg.rows, inputImg.cols, CV_32FC1, t_b);
-	cv::resize(t_b_, I1, cv::Size(256, 256), 0, 0, CV_INTER_CUBIC);
+	cv::Mat dst(I.rows, I.cols, CV_32FC1, fused), final_img;
+	dst.convertTo(final_img, CV_8UC1);
+	
+	delete[] fused;
+	return final_img;
+}
+
+cv::Mat get_enhance_params(cv::Mat &I, float &gamma, float &beta)
+{
+	int size;
+	int64 t1 = cv::getTickCount();
+	cv::Mat I1;
+	cv::resize(I, I1, cv::Size(256, 256), 0, 0, CV_INTER_CUBIC);
 	size = I1.rows * I1.rows;
-	//t_our = tsmooth(load_binary_to_array("t_b2", I.rows * I.rows), I.rows);
 	float *t_our = new float[size * 2];
-	tsmooth((float*)I1.data, t_our, I1.rows );
-	//save_array_to_binary("t_our", t_our, 2 * I.rows * I.rows);
-	//t_our = load_binary_to_array("t_our", 2 * size);
+	tsmooth((float*)I1.data, t_our, I1.rows);
 	float *W_f = t_our + size;
 	//
 	cv::Mat t(I1.rows, I1.cols, CV_32FC1, t_our);
 	cv::Mat W(I1.rows, I1.cols, CV_32FC1, W_f);
-	cv::resize(t, t, cv::Size(I.rows, I.cols), 0, 0, CV_INTER_CUBIC);
 	cv::resize(W, W, cv::Size(I.rows, I.cols), 0, 0, CV_INTER_CUBIC);
-	cv::cvtColor(W, W, cv::COLOR_GRAY2BGR);
-	if (debug) {
-		cv::imwrite("W.jpg", W * 255);
-		cv::imwrite("1-W.jpg", (1 - W) * 255);
-		cv::imwrite("t.jpg", t * 255);
-		cv::imwrite("1-t.jpg", (1 - t) * 255);
-	}
+#if debug
+	cv::resize(t, t, cv::Size(I.rows, I.cols), 0, 0, CV_INTER_CUBIC);
+	cv::imwrite("W.jpg", W * 255);
+	cv::imwrite("1-W.jpg", (1 - W) * 255);
+	cv::imwrite("t.jpg", t * 255);
+	cv::imwrite("1-t.jpg", (1 - t) * 255);
+#endif
 	//
-	float *J = new float[I.cols * I.rows * 3];
-	maxEntropyEnhance(I, t, J);
-	size = I.cols * I.rows * 3;
-	float *fused = new float[size], *I_ = (float*)I.data, *W_ = (float*)W.data;
-	for (int i = 0; i < size; i++) {
-		fused[i] = ((I_[i] * W_[i]) + J[i] * (1 - W_[i])) * 255.0f;
-	}
-	cv::Mat dst(I.rows, I.cols, CV_32FC3, fused), final_img;
-	dst.convertTo(final_img, CV_8UC3);
-	
-	delete[] t_b;
-	delete[] fused;
+	int64 t2 = cv::getTickCount();
+	maxEntropyEnhance(I, t, gamma, beta);
+	int64 t3 = cv::getTickCount();
+	calc_timing(t2, t3, "maxEntropyEnhance time");
+	calc_timing(t1, t3, "total paramerization time");
 	delete[] t_our;
-	delete[] J;
-	return final_img;
+	return W;
 }
 
 int tsmooth(float *I, float *t_W, int rows, float lambd, int sigma, float sharpness)
 {
+	int64 t0 = cv::getTickCount();
 	int size = rows * rows;
 	float *wx = new float[size], *wy = new float[size];
 	computeTextureWeights(I, rows, sigma, sharpness, wx, wy);
-	
+	int64 t1 = cv::getTickCount();
 	solveLinearEquation(I, rows, wx, wy, lambd, t_W);
+	int64 t2 = cv::getTickCount();
+	calc_timing(t0, t1, "computeTextureWeights time");
+	calc_timing(t1, t2, "solveLinearEquation time");
 
 	delete[] wx;
 	delete[] wy;
@@ -239,7 +215,7 @@ float* convertCol_delay_col(float *wx, int rows, float lambd)
 	return dx;
 }
 
-int maxEntropyEnhance(cv::Mat &I, cv::Mat &t, float *J, float bad_threshold, float a, float b)
+int maxEntropyEnhance(cv::Mat &I, cv::Mat &t, float &gamma, float &beta, float bad_threshold, float mink, float maxk, float a, float b)
 {
 	cv::Mat Y1, t1;
 	cv::resize(I, Y1, cv::Size(50, 50));
@@ -248,7 +224,7 @@ int maxEntropyEnhance(cv::Mat &I, cv::Mat &t, float *J, float bad_threshold, flo
 	float *t1_ = (float*)t1.data, *Y1_ = (float*)Y1.data, factor = 1.0f / 3.0f;
 	for (int i = 0; i < 50 * 50; i++) {
 		if (t1_[i] < bad_threshold) {
-			float temp = pow(Y1_[3 * i] * Y1_[3 * i + 1] * Y1_[3 * i + 2], factor);
+			float temp = Y1_[i];
 			if (temp > 0.0f) {
 				Y[Y_len++] = temp;
 			}
@@ -256,7 +232,7 @@ int maxEntropyEnhance(cv::Mat &I, cv::Mat &t, float *J, float bad_threshold, flo
 	}
 	// fminbound
 	//float lb = -3.0f, ub = 6.0f, g = (sqrt(5.0f) - 1.0f) / 2.0f, E=1e-3f;
-	float E = 1e-3f, lb = 1.0f + E, ub = 10.0f, g = (sqrt(5.0f) - 1.0f) / 2.0f;
+	float E = 1e-3f, lb = mink, ub = maxk, g = (sqrt(5.0f) - 1.0f) / 2.0f;
 	float f_lb, f_ub1, lb1, ub1; int repeated_num = 0;
 	lb1 = lb + (1 - g)*(ub - lb); ub1 = lb + g*(ub - lb);
 	f_lb = negative_entropy(Y, Y_len, lb, a, b); f_ub1 = negative_entropy(Y, Y_len, ub1, a, b);
@@ -273,20 +249,15 @@ int maxEntropyEnhance(cv::Mat &I, cv::Mat &t, float *J, float bad_threshold, flo
 		}
 		repeated_num++;
 	}
-	float opt_val = (ub + lb) / 2;
-	if (debug) {
-		cout << "-entropy(Y): " << -entropy(Y, Y_len) << endl;
-		cout << opt_val << ", " << negative_entropy(Y, Y_len, ub1, a, b) << endl;
-		cout << "repeated_num: " << repeated_num << endl;
-	}
+	float opt_k = (ub + lb) / 2;
+#if debug
+	cout << "-entropy(Y): " << -entropy(Y, Y_len) << endl;
+	cout << opt_val << ", " << negative_entropy(Y, Y_len, ub1, a, b) << endl;
+	cout << "repeated_num: " << repeated_num << endl;
+#endif
 	//applyK(I, opt_k)
 	delete[]Y;
-	int size = I.cols * I.rows * 3;
-	float *I_ = (float*)I.data;
-	float gamma = pow(opt_val, a), beta = exp((1 - gamma) * b);
-	for (int i = 0; i < size; i++) {
-		J[i] = pow(I_[i], gamma) * beta;
-	}
+	gamma = pow(opt_k, a); beta = exp((1 - gamma) * b);
 	return 1;
 }
 
@@ -300,10 +271,8 @@ float entropy(float *Y, int num)
 	return -(logsum / sum - log(sum));
 }
 
-
 float negative_entropy(float *Y, int num, float k, float a, float b)
 {
-	//return sample(k);
 	float gamma = pow(k, a), beta = exp((1 - gamma) * b);
 	float logsum = 0.0f, sum = 0.0f;
 	for (int i = 0; i < num; i++) {
@@ -314,7 +283,9 @@ float negative_entropy(float *Y, int num, float k, float a, float b)
 	return (logsum / sum - log(sum));
 }
 
-float sample(float x)
+int calc_timing(int64 srart_time, int64 end_time, const char *string)
 {
-	return x * x - 2*x + 2; 
+	double time = (end_time - srart_time) / cv::getTickFrequency() * 1000;
+	printf("%s: %f ms\n", string, time / 10);
+	return 1;
 }

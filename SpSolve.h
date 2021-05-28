@@ -7,3 +7,4 @@
 typedef Eigen::SparseMatrix<float> SparseMatrixType;
 typedef Eigen::Triplet<float> T;
 typedef Eigen::SimplicialCholesky<SparseMatrixType> Solve;
+int sample_solve();

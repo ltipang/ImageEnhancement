@@ -1,7 +1,7 @@
 #include "oneHDR.h"
 #include "SpSolve.h"
 
-bool debug = false;
+
 
 cv::Mat oneHDR(cv::Mat &inputImg)
 {
@@ -38,7 +38,7 @@ cv::Mat get_enhance_params(cv::Mat &I, float &gamma, float &beta)
 	cv::Mat t(I1.rows, I1.cols, CV_32FC1, t_our);
 	cv::Mat W(I1.rows, I1.cols, CV_32FC1, W_f);
 	cv::resize(W, W, cv::Size(I.rows, I.cols), 0, 0, CV_INTER_CUBIC);
-#if debug
+#ifdef _DEBUG
 	cv::resize(t, t, cv::Size(I.rows, I.cols), 0, 0, CV_INTER_CUBIC);
 	cv::imwrite("W.jpg", W * 255);
 	cv::imwrite("1-W.jpg", (1 - W) * 255);
